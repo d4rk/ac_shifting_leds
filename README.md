@@ -36,3 +36,7 @@ Peak RPM set to 7000
 You may get HID permission errors if the G29 isn't accessible to your user account. If that's the case,
 then you may need to update your `udev` rules. See the [instructions](https://github.com/berarma/oversteer#permissions) 
 in the Oversteer docs for more details.
+
+## Feedback
+
+Feel free to file issues [here](https://github.com/d4rk/ac_shifting_leds/issues).
