@@ -12,7 +12,7 @@ A **Linux** utility for Assetto Corsa that lights up the shifting LEDs on the Lo
   
 ## Usage
 
-1. Download [ac_shifting_leds.js][https://github.com/d4rk/ac_shifting_leds/raw/main/ac_shifting_leds.js].
+1. Download [ac_shifting_leds.js](https://github.com/d4rk/ac_shifting_leds/raw/main/ac_shifting_leds.js).
 
 2. In terminal, launch `ac_shifting_leds.js`:
 ```
