@@ -1,6 +1,8 @@
 # Assetto Corsa G29 Shifting LEDs
 
-A Linux utility for Assetto Corsa that lights up the shifting LEDs on the Logitech G29 wheel based on the car's engine RPM.
+A **Linux** utility for Assetto Corsa that lights up the shifting LEDs on the Logitech G29 wheel based on the car's engine RPM.
+
+![image of the shifting LEDs on the G29](images/shifting_leds.png?raw=true)
 
 ## Requirements
 - NodeJS
