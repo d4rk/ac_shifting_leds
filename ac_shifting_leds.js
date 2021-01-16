@@ -76,103 +76,134 @@ const OPERATION_ID_SUBSCRIBE_DISMISS = 3;
 // Binary format also inferred from:
 // https://github.com/bradland/ac_telemetry/blob/master/lib/ac_telemetry/bin_formats/rt_car_info.rb
 
-/**
- * A class that manages a UDP connection to a running instance of Assetto Corsa.
- * Based on the specs from:
- * https://docs.google.com/document/d/1KfkZiIluXZ6mMhLWfDX1qAGbvhGRC3ZUzjVIt5FQpp4/pub
- * 
- * Class emits 3 events:
- *   - 'connected' - when a connection is established to AC
- *   - 'disconnected' - when the connection is lost or dropped intentionally
- *   - 'carInfo' - when a message with telemetry info is received
- */
-class ACClient extends EventEmitter {
+
+/** Base class that implements a UDP client with some reconnection logic.  */
+class UDPGameClient extends EventEmitter {
   udpClient;
   host;
   port;
-  handshakeStage = 0;
   reconnectTimer;
   lastMessageTimestamp;
 
-  constructor(host = 'localhost', port = 9996) {
+  constructor(host, port) {
     super();
+    if (this.constructor === UDPGameClient) {
+      throw new Error("Instantiate a subclass, not this class");
+    }
     this.host = host;
     this.port = port;
   }
 
   connect() {
-    if (this.udpClient) {
-      this.disconnect();
-    }
-    this.handshakeStage = 0;
+    this.disconnect();
     this.udpClient = udp.createSocket('udp4');
     var _this = this;
     this.udpClient.on('message', function (msg, info) {
-      _this.processUDPMessage(msg, info);
-      _this.lastMessageTimestamp = Date.now();      
+      _this._processUDPMessage(msg, info);
+      _this.lastMessageTimestamp = Date.now();
     });
-    console.log("Connecting to Assetto Corsa at %s:%s (UDP)", this.host, this.port);
-    this.sendHandshakeRequest(OPERATION_ID_HANDSHAKE);
-    this.setupReconnectTimer();
+    console.log("UDP %s:%s (UDP)", this.host, this.port);
+    this._setupReconnectTimer();
   }
 
   disconnect() {
     if (this.udpClient == undefined) {
       return;
     }
-    this.stopReconnectTimer();
-    this.udpClient.send(this.handshakeRequest(OPERATION_ID_SUBSCRIBE_DISMISS), this.port, this.host);
+    this._stopReconnectTimer();
     this.udpClient.close();
     this.udpClient = null;
-    this.emit('disconnected');
   }
 
-  // Private methods.
+  sendUDPMessage(message, errorFunction = undefined) {
+    if (this.udpClient != undefined) {
+      this.udpClient.send(message, this.port, this.host, errorFunction);
+    }
+  }
 
-  stopReconnectTimer() {
+  _processUDPMessage(msg, info) {
+    throw new Error("Should be implemented by subclasses");
+  }
+
+  _stopReconnectTimer() {
     if (this.reconnectTimer != undefined) {
       clearInterval(this.reconnectTimer);
       this.reconnectTimer = null;
     }
   }
 
-  setupReconnectTimer() {
-    this.stopReconnectTimer();
+  _setupReconnectTimer() {
+    this._stopReconnectTimer();
     var _this = this;
-    this.reconnectTimer = setInterval(function() { _this.reconnectIfNeeded(); }, 2000);
+    this.reconnectTimer = setInterval(function () { _this._reconnectIfNeeded(); }, 2000);
   }
 
-  reconnectIfNeeded() {
+  _reconnectIfNeeded() {
     // If we haven't gotten a message in the past 2 seconds, attempt a reconnect.
-    if (Date.now() - this.lastMessageTimestamp > 2000) {
+    if (this.lastMessageTimestamp == undefined
+      || Date.now() - this.lastMessageTimestamp > 2000) {
       this.disconnect();
       this.connect();
     }
   }
+}
 
-  processUDPMessage(msg, info) {
+/**
+ * A class that connects to a running instance of Assetto Corsa using UDP.
+ * Based on the specs from:
+ * https://docs.google.com/document/d/1KfkZiIluXZ6mMhLWfDX1qAGbvhGRC3ZUzjVIt5FQpp4/pub
+ *
+ * Class emits 3 events:
+ *   - 'connected' - when a connection is established to AC
+ *   - 'disconnected' - when the connection is lost or dropped intentionally
+ *   - 'carInfo' - when a message with telemetry info is received
+ */
+class ACClient extends UDPGameClient {
+  handshakeStage = 0;
+
+  constructor(host = 'localhost', port = 9996) {
+    super(host, port);
+  }
+
+  connect() {
+    console.log("Connecting to Assetto Corsa");
+    super.connect();
+    this._sendHandshakeRequest(OPERATION_ID_HANDSHAKE);
+  }
+
+  disconnect() {
+    this.sendUDPMessage(this._handshakeRequest(OPERATION_ID_SUBSCRIBE_DISMISS));
+    super.disconnect();
+    this.emit('disconnected');
+  }
+
+  // Protected methods.
+
+  _processUDPMessage(msg, info) {
     if (this.handshakeStage == 0) {
       this.handshakeStage++;
-      var handshakeResponse = this.parseHandshakeResponse(msg);
+      var handshakeResponse = this._parseHandshakeResponse(msg);
       console.log("Connected");
-      this.sendHandshakeRequest(OPERATION_ID_SUBSCRIBE_UPDATE);
+      this._sendHandshakeRequest(OPERATION_ID_SUBSCRIBE_UPDATE);
       this.emit('connected', handshakeResponse);
     } else {
-      var carInfo = this.parseRTCarInfo(msg);
+      var carInfo = this._parseRTCarInfo(msg);
       this.emit('carInfo', carInfo);
     }
   }
 
-  sendHandshakeRequest(operationId) {
-    this.udpClient.send(this.handshakeRequest(operationId),
-      this.port, this.host, function (error) {
+  // Private methods.
+
+  _sendHandshakeRequest(operationId) {
+    this.sendUDPMessage(this._handshakeRequest(operationId),
+      function (error) {
         if (error) {
           this.disconnect();
         }
       });
   }
 
-  handshakeRequest(operationId) {
+  _handshakeRequest(operationId) {
     var buffer = Buffer.alloc(4 * 3);
     buffer.writeUInt32LE(0);
     buffer.writeUInt32LE(0, 4);
@@ -180,7 +211,7 @@ class ACClient extends EventEmitter {
     return buffer;
   }
 
-  parseHandshakeResponse(msg) {
+  _parseHandshakeResponse(msg) {
     var reader = new BufferReader(Buffer.from(msg));
     return {
       carName: reader.stringUtf16(100),
@@ -196,7 +227,7 @@ class ACClient extends EventEmitter {
    * Based on the (outdated) info from the official spec, and the corrected spec from:
    * https://github.com/bradland/ac_telemetry/blob/master/lib/ac_telemetry/bin_formats/rt_car_info.rb
    */
-  parseRTCarInfo(msg) {
+  _parseRTCarInfo(msg) {
     var reader = new BufferReader(Buffer.from(msg));
 
     return {
@@ -419,7 +450,7 @@ class ACLeds {
     // If we're max-ed out i.e. probably redline, then flash all the LEDs.
     if (LEDMask == 0x1f && this.enableRedlineFlashing) {
       var _this = this;
-      this.flashLEDsTimer = setInterval(function() { _this.flashLEDs(); }, 100);
+      this.flashLEDsTimer = setInterval(function () { _this.flashLEDs(); }, 100);
     } else {
       if (this.flashLEDsTimer) {
         clearInterval(this.flashLEDsTimer);
