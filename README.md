@@ -1,4 +1,4 @@
-# Assetto Corsa / Dirt G29 Shifting LEDs
+# Logitech G29 Shifter LEDs for Assetto Corsa & Dirt 4
 
 A **Linux** utility for Assetto Corsa and Dirt 4 that lights up the shifting LEDs on the Logitech G29 wheel based on the car's engine RPM.
 
