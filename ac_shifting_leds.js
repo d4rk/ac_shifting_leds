@@ -82,16 +82,18 @@ class UDPGameClient extends EventEmitter {
   udpClient;
   host;
   port;
+  listenOnPort;
   reconnectTimer;
   lastMessageTimestamp;
 
-  constructor(host, port) {
+  constructor(host, port, listenOnPort = false) {
     super();
     if (this.constructor === UDPGameClient) {
       throw new Error("Instantiate a subclass, not this class");
     }
     this.host = host;
     this.port = port;
+    this.listenOnPort = listenOnPort;
   }
 
   connect() {
@@ -102,7 +104,9 @@ class UDPGameClient extends EventEmitter {
       _this._processUDPMessage(msg, info);
       _this.lastMessageTimestamp = Date.now();
     });
-    console.log("UDP %s:%s (UDP)", this.host, this.port);
+    if (this.listenOnPort) {
+      this.udpClient.bind({ port: this.port, address: this.host });
+    }
     this._setupReconnectTimer();
   }
 
@@ -163,10 +167,10 @@ class ACClient extends UDPGameClient {
 
   constructor(host = 'localhost', port = 9996) {
     super(host, port);
+    console.log("Connecting to Assetto Corsa");
   }
 
   connect() {
-    console.log("Connecting to Assetto Corsa");
     super.connect();
     this._sendHandshakeRequest(OPERATION_ID_HANDSHAKE);
   }
@@ -183,7 +187,7 @@ class ACClient extends UDPGameClient {
     if (this.handshakeStage == 0) {
       this.handshakeStage++;
       var handshakeResponse = this._parseHandshakeResponse(msg);
-      console.log("Connected");
+      console.log("Assetto Corsa: subscribing to updates");
       this._sendHandshakeRequest(OPERATION_ID_SUBSCRIBE_UPDATE);
       this.emit('connected', handshakeResponse);
     } else {
@@ -223,7 +227,7 @@ class ACClient extends UDPGameClient {
     };
   }
 
-  /** 
+  /**
    * Based on the (outdated) info from the official spec, and the corrected spec from:
    * https://github.com/bradland/ac_telemetry/blob/master/lib/ac_telemetry/bin_formats/rt_car_info.rb
    */
@@ -365,8 +369,43 @@ class ACClient extends UDPGameClient {
 }
 
 /**
+ * A class that accepts incoming connections from Codemasters / Dirt games.
+ * Based on the specs from:
+ * https://docs.google.com/spreadsheets/d/1eA518KHFowYw7tSMa-NxIFYpiWe5JXgVVQ_IMs7BVW0/edit#gid=0
+ *
+ * Class emits 2 events:
+ *   - 'disconnected' - when the connection is lost or dropped intentionally
+ *   - 'carInfo' - when a message with telemetry info is received
+ */
+class CodemastersClient extends UDPGameClient {
+  constructor(host = 'localhost', port = 20777) {
+    super(host, port, true);
+    console.log("Connecting to Dirt / Codemasters");
+  }
+
+  connect() {
+    super.connect();
+  }
+
+  disconnect() {
+    super.disconnect();
+    this.emit('disconnected');
+  }
+
+  _processUDPMessage(msg, info) {
+    var reader = new BufferReader(Buffer.from(msg));
+    this.emit('carInfo', {
+      unused1: reader.skip(37 * 4),
+      engineRPM: reader.float() * 10.0,
+      unused2: reader.skip(25 * 4),
+      peakRPM: reader.float() * 10.0,
+    });
+  }
+}
+
+/**
  * A class that processes telemetry events from `ACClient` and lights up the LEDs
- * of the Logitech G29 wheel. 
+ * of the Logitech G29 wheel.
  */
 class ACLeds {
   acClient;
@@ -376,6 +415,7 @@ class ACLeds {
   previousLEDMask;
   LEDsOn;
   enableRedlineFlashing;
+  loggedFirstMessage;
 
   constructor(acClient, enableRedlineFlashing = true) {
     this.acClient = acClient;
@@ -385,7 +425,15 @@ class ACLeds {
     });
     acClient.on('carInfo', function (carInfo) {
       _this.processCarInfo(carInfo);
+      // Log the first message after a disconnect.
+      if (!this.loggedFirstMessage) {
+        console.log('Receiving data. First message:\n' + JSON.stringify(carInfo, null, ' '));
+        this.loggedFirstMessage = true;
+      }
     });
+    acClient.on('disconnected', function () {
+      this.loggedFirstMessage = false;
+    })
     this.enableRedlineFlashing = enableRedlineFlashing;
   }
 
@@ -401,6 +449,17 @@ class ACLeds {
 
   onConnected(handshakeResponse) {
     console.log(handshakeResponse);
+    // Default peak RPM. This will be updated when `carInfo` messages start
+    // coming in. Currently the AC protocol doesn't supply RPM range info of the cars.
+    this.peakRPM = 7000;
+    console.log("Peak RPM set to " + this.peakRPM);
+    this.connectToWheelIfNeeded();
+  }
+
+  connectToWheelIfNeeded() {
+    if (this.device != undefined) {
+      return;
+    }
     // Connect to the first Logitech G29.
     try {
       this.device = new hid.HID(1133, 49743);
@@ -410,14 +469,14 @@ class ACLeds {
       console.log(e);
       exit(1);
     }
-    // Default peak RPM. This will be updated when `carInfo` messages start
-    // coming in. Currently the protocol doesn't supply RPM range info of the cars.
-    this.peakRPM = 7000;
-    console.log("Peak RPM set to " + this.peakRPM);
   }
 
   processCarInfo(carInfo) {
+    this.connectToWheelIfNeeded();
     this.setLEDsFromRPM(carInfo.engineRPM);
+    if (carInfo.peakRPM != undefined) {
+      this.peakRPM = carInfo.peakRPM;
+    }
   }
 
   setLEDsFromRPM(rpm) {
@@ -471,6 +530,8 @@ class ACLeds {
 }
 
 // Main entry point.
-var acClient = new ACClient();
-var acLEDs = new ACLeds(acClient, enableRedlineFlashing = true);
+var dirtLEDs = new ACLeds(new CodemastersClient(), enableRedlineFlashing = true);
+dirtLEDs.start();
+
+var acLEDs = new ACLeds(new ACClient(), enableRedlineFlashing = true);
 acLEDs.start();
