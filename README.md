@@ -1,6 +1,8 @@
 # Assetto Corsa G29 Shifting LEDs
 
-A Linux utility for Assetto Corsa that lights up the shifting LEDs on the Logitech G29 wheel based on the car's engine RPM.
+A **Linux** utility for Assetto Corsa that lights up the shifting LEDs on the Logitech G29 wheel based on the car's engine RPM.
+
+![image of the shifting LEDs on the G29](images/shifting_leds.png?raw=true)
 
 ## Requirements
 - NodeJS
@@ -10,12 +12,14 @@ A Linux utility for Assetto Corsa that lights up the shifting LEDs on the Logite
   
 ## Usage
 
-In terminal, launch `ac_shifting_leds.js`:
+1. Download [ac_shifting_leds.js](https://github.com/d4rk/ac_shifting_leds/raw/main/ac_shifting_leds.js).
+
+2. In terminal, launch `ac_shifting_leds.js`:
 ```
 #:~/Downloads$ node ac_shifting_leds.js 
 ```
 
-Then launch Assetto Corsa and start playing.
+3. Then launch Assetto Corsa and start playing.
 
 If you switch back to the terminal, you should see success messages:
 ```
@@ -33,7 +37,9 @@ Connected to Logitech G29 wheel
 Peak RPM set to 7000
 ```
 
-You may get HID permission errors if the G29 isn't accessible to your user account. If that's the case,
+## Problems
+
+- You may get HID permission errors if the G29 isn't accessible to your user account. If that's the case,
 then you may need to update your `udev` rules. See the [instructions](https://github.com/berarma/oversteer#permissions) 
 in the Oversteer docs for more details.
 
