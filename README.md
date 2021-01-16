@@ -1,6 +1,6 @@
-# Assetto Corsa G29 Shifting LEDs
+# Assetto Corsa / Dirt G29 Shifting LEDs
 
-A **Linux** utility for Assetto Corsa that lights up the shifting LEDs on the Logitech G29 wheel based on the car's engine RPM.
+A **Linux** utility for Assetto Corsa and Dirt 4 that lights up the shifting LEDs on the Logitech G29 wheel based on the car's engine RPM.
 
 ![image of the shifting LEDs on the G29](images/shifting_leds.png?raw=true)
 
@@ -19,12 +19,13 @@ A **Linux** utility for Assetto Corsa that lights up the shifting LEDs on the Lo
 #:~/Downloads$ node ac_shifting_leds.js 
 ```
 
-3. Then launch Assetto Corsa and start playing.
+3. Then launch your game of choice and start playing.
 
-If you switch back to the terminal, you should see success messages:
+If you switch back to the terminal, you should see some success messages:
 ```
-Connecting to Assetto Corsa at localhost:9996 (UDP)
-Connected
+Connecting to Dirt / Codemasters
+Connecting to Assetto Corsa
+Assetto Corsa: subscribing to updates
 {
   carName: 'bmw_1m',
   driverName: 'Player',
@@ -33,8 +34,12 @@ Connected
   trackName: 'drift',
   trackConfig: 'drift'
 }
-Connected to Logitech G29 wheel
 Peak RPM set to 7000
+Connected to Logitech G29 wheel
+Receiving data. First message:
+{
+ "identifier": 97,
+ "size": 328,
 ```
 
 ## Problems
@@ -42,6 +47,19 @@ Peak RPM set to 7000
 - You may get HID permission errors if the G29 isn't accessible to your user account. If that's the case,
 then you may need to update your `udev` rules. See the [instructions](https://github.com/berarma/oversteer#permissions) 
 in the Oversteer docs for more details.
+
+- In Dirt 4, you will need to enable UDP telemetry data. Open the following file in your favorite text editor:
+```
+~/.local/share/feral-interactive/DiRT 4/VFS/User/AppData/Roaming/My Games/DiRT 4/hardwaresettings/hardware_settings_config.xml
+```
+and change:
+```
+<udp enabled="false" extradata="3" ip="127.0.0.1" port="20777" delay="1" />`
+```
+to
+```
+<udp enabled="true" extradata="3" ip="127.0.0.1" port="20777" delay="1" />`
+```
 
 ## Feedback
 
