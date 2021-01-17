@@ -178,6 +178,7 @@ class ACClient extends UDPGameClient {
   disconnect() {
     this.sendUDPMessage(this._handshakeRequest(OPERATION_ID_SUBSCRIBE_DISMISS));
     super.disconnect();
+    this.handshakeStage = 0;
     this.emit('disconnected');
   }
 
