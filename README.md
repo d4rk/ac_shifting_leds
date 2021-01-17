@@ -42,7 +42,7 @@ Receiving data. First message:
  "size": 328,
 ```
 
-## Problems
+## Potential Issues
 
 - You may get HID permission errors if the G29 isn't accessible to your user account. If that's the case,
 then you may need to update your `udev` rules. See the [instructions](https://github.com/berarma/oversteer#permissions) 
